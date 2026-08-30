@@ -1,22 +1,74 @@
+import { STATIC_VAULT_TREE } from '../data/staticVault.js';
+
 const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-// When running on local machine, target the local Express server on 5176.
-// When deployed on Vercel or Tailscale, target relative /api (handled by Vercel Serverless / Proxy).
 const API_BASE = isLocal 
   ? 'http://localhost:5176/api' 
   : '/api';
 
+// Helper: Find note recursively in static fallback snapshot
+function findNoteInTree(items, targetPath) {
+  for (const item of items) {
+    if (item.type === 'note' && item.path === targetPath) {
+      return item;
+    }
+    if (item.children) {
+      const res = findNoteInTree(item.children, targetPath);
+      if (res) return res;
+    }
+  }
+  return null;
+}
+
 export async function fetchVaultTree() {
-  const res = await fetch(`${API_BASE}/vault/tree`);
-  if (!res.ok) throw new Error(`Vault fetch failed: ${res.status}`);
-  const data = await res.json();
-  return data.tree || [];
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+
+    const res = await fetch(`${API_BASE}/vault/tree`, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.tree && data.tree.length > 0) return data.tree;
+    }
+  } catch (err) {
+    console.warn('Network fetch failed, using instant Static Vault Snapshot:', err.message);
+  }
+
+  // 100% Guaranteed Static Snapshot Fallback (Never fails, 0ms load)
+  return STATIC_VAULT_TREE;
 }
 
 export async function fetchNote(path) {
-  const res = await fetch(`${API_BASE}/notes?path=${encodeURIComponent(path)}`);
-  if (!res.ok) throw new Error(`Note fetch failed: ${res.status}`);
-  return await res.json();
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+
+    const res = await fetch(`${API_BASE}/notes?path=${encodeURIComponent(path)}`, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('Network note fetch failed, using Static Snapshot note:', err.message);
+  }
+
+  const staticNote = findNoteInTree(STATIC_VAULT_TREE, path);
+  if (staticNote) {
+    return {
+      success: true,
+      path: staticNote.path,
+      fileName: staticNote.fileName,
+      title: staticNote.title,
+      attributes: staticNote.attributes,
+      body: staticNote.body,
+      raw: staticNote.raw
+    };
+  }
+
+  throw new Error('Note not found');
 }
 
 export async function saveNote(path, title, body, attributes = {}) {
