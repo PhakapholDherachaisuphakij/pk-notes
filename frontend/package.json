@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5175 --host",
-    "prebuild": "node ../generate_static_vault.js",
-    "build": "node ../generate_static_vault.js && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
