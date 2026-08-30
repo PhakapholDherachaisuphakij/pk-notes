@@ -1,0 +1,13 @@
+{
+  "name": "pk-notes",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "if [ -d \"frontend\" ]; then node generate_static_vault.js 2>/dev/null || true; cd frontend && npm install && npm run build; else npm install && npm run build; fi"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "bcryptjs": "^3.0.2"
+  }
+}
