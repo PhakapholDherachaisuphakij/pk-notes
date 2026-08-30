@@ -11,7 +11,8 @@ import {
   FolderPlus, 
   Sparkles,
   BookOpen,
-  Settings
+  Settings,
+  X
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -24,7 +25,8 @@ export default function Sidebar({
   onOpenAICopilot,
   searchQuery,
   setSearchQuery,
-  isCollapsed
+  isCollapsed,
+  onCloseMobile
 }) {
   const [openFolders, setOpenFolders] = useState({
     'KMUTT-Study': true,
@@ -62,12 +64,11 @@ export default function Sidebar({
                   onCreateNote(item.path);
                 }}
                 title="New note in folder"
-                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-neutral-300 dark:hover:bg-neutral-700 rounded transition-opacity"
+                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded text-neutral-500 transition-opacity"
               >
                 <Plus size={12} />
               </button>
             </div>
-
             {isOpen && item.children && (
               <div>{renderTree(item.children, depth + 1)}</div>
             )}
@@ -75,39 +76,38 @@ export default function Sidebar({
         );
       }
 
-      // Note item
-      const isActive = activeNotePath === item.path;
+      const isSelected = activeNotePath === item.path;
+      const isPrivate = item.attributes?.is_private || false;
+
       return (
         <div
           key={item.path}
           onClick={() => onSelectNote(item.path)}
-          className={`flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer text-xs group transition-colors select-none ${
-            isActive
-              ? 'bg-neutral-200/80 dark:bg-neutral-800 text-notion-text dark:text-white font-semibold'
-              : 'text-neutral-700 dark:text-neutral-300 hover:bg-notion-hover dark:hover:bg-notion-darkHover'
+          className={`flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer text-xs group transition-colors ${
+            isSelected
+              ? 'bg-notion-active dark:bg-notion-darkActive text-notion-text dark:text-notion-darkText font-medium'
+              : 'text-neutral-600 dark:text-neutral-400 hover:bg-notion-hover dark:hover:bg-notion-darkHover'
           }`}
           style={{ paddingLeft: `${depth * 14 + 20}px` }}
         >
-          <div className="flex items-center gap-2 truncate">
-            {item.isPrivate ? (
-              <Lock size={13} className="text-amber-500 shrink-0" title="Private Note" />
-            ) : (
-              <FileText size={14} className={isActive ? "text-rose-500 shrink-0" : "text-neutral-400 shrink-0"} />
-            )}
+          <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+            <FileText size={14} className={isSelected ? 'text-rose-500 shrink-0' : 'text-neutral-400 shrink-0'} />
             <span className="truncate">{item.name}</span>
-            {item.isPrivate && (
-              <span className="text-[9px] font-mono px-1 rounded bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-300/60 dark:border-amber-800/60">
-                Private
+            {isPrivate && (
+              <span className="text-[10px] px-1 bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded shrink-0 border border-amber-300/40">
+                🔒
               </span>
             )}
           </div>
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (confirm(`Delete "${item.name}"?`)) onDeleteNote(item.path);
+              if (confirm(`Delete "${item.name}"?`)) {
+                onDeleteNote(item.path);
+              }
             }}
             title="Delete Note"
-            className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-rose-500 rounded transition-opacity"
+            className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded text-neutral-400 hover:text-rose-500 transition-opacity"
           >
             <Trash2 size={12} />
           </button>
@@ -134,14 +134,16 @@ export default function Sidebar({
     return result;
   };
 
-  if (isCollapsed) return null;
-
   return (
-    <aside className="w-64 bg-notion-sidebar dark:bg-notion-darkSidebar border-r border-notion-border dark:border-notion-darkBorder flex flex-col h-full shrink-0 select-none">
+    <aside 
+      className={`fixed inset-y-0 left-0 z-40 w-72 md:w-64 bg-notion-sidebar dark:bg-notion-darkSidebar border-r border-notion-border dark:border-notion-darkBorder flex flex-col h-full shrink-0 select-none shadow-2xl md:shadow-none transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
+        isCollapsed ? '-translate-x-full md:hidden' : 'translate-x-0'
+      }`}
+    >
       {/* Header */}
       <div className="p-3 border-b border-notion-border dark:border-notion-darkBorder flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-rose-500 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+          <div className="w-6 h-6 rounded bg-rose-500 text-white flex items-center justify-center text-xs font-bold shadow-xs">
             PK
           </div>
           <span className="font-semibold text-sm tracking-tight text-neutral-800 dark:text-neutral-200">
@@ -151,6 +153,13 @@ export default function Sidebar({
             Obsidian
           </span>
         </div>
+        {/* Close button for mobile drawer */}
+        <button
+          onClick={onCloseMobile}
+          className="md:hidden p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       {/* Quick Action Buttons */}
@@ -162,10 +171,12 @@ export default function Sidebar({
           <Sparkles size={14} />
           <span>Ask Second Brain (Hermes)</span>
         </button>
+      </div>
 
-        {/* Search */}
-        <div className="relative mt-2">
-          <Search size={13} className="absolute left-2.5 top-2.5 text-neutral-400" />
+      {/* Search Input */}
+      <div className="px-2 py-1">
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-2 text-neutral-400" />
           <input
             type="text"
             value={searchQuery}

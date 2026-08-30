@@ -21,7 +21,8 @@ import {
   Sparkles,
   Lock,
   User,
-  LogOut
+  LogOut,
+  BookOpen
 } from 'lucide-react';
 
 export default function App() {
@@ -30,7 +31,9 @@ export default function App() {
   const [activeNote, setActiveNote] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+  });
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('pk_notes_dark') !== 'false';
   });
@@ -90,6 +93,10 @@ export default function App() {
       const data = await fetchNote(path);
       setActiveNotePath(path);
       setActiveNote(data);
+      // Auto-collapse sidebar on mobile when selecting a note
+      if (window.innerWidth < 768) {
+        setIsSidebarCollapsed(true);
+      }
     } catch (err) {
       console.error('Failed to fetch note:', err);
     }
@@ -180,8 +187,17 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-notion-bg dark:bg-notion-darkBg text-notion-text dark:text-notion-darkText select-none">
-      {/* Sidebar */}
+    <div className="flex h-screen w-screen overflow-hidden bg-notion-bg dark:bg-notion-darkBg text-notion-text dark:text-notion-darkText font-sans select-none antialiased">
+      
+      {/* Mobile Drawer Backdrop */}
+      {!isSidebarCollapsed && (
+        <div 
+          onClick={() => setIsSidebarCollapsed(true)}
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs z-30 md:hidden animate-in fade-in"
+        />
+      )}
+
+      {/* Sidebar (Responsive Drawer) */}
       <Sidebar
         vaultTree={vaultTree}
         activeNotePath={activeNotePath}
@@ -189,89 +205,94 @@ export default function App() {
         onCreateNote={handleCreateNote}
         onCreateFolder={handleCreateFolder}
         onDeleteNote={handleDeleteNote}
-        onOpenAICopilot={() => {
-          if (!currentUser) {
-            setIsAuthModalOpen(true);
-          } else {
-            setIsAICopilotOpen(true);
-          }
-        }}
+        onOpenAICopilot={() => setIsAICopilotOpen(true)}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         isCollapsed={isSidebarCollapsed}
+        onCloseMobile={() => setIsSidebarCollapsed(true)}
       />
 
       {/* Main Workspace Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
+      <main className="flex-1 flex flex-col h-full overflow-hidden w-full min-w-0">
         {/* Global Nav Bar */}
-        <header className="h-10 border-b border-notion-border dark:border-notion-darkBorder px-4 flex items-center justify-between text-xs shrink-0 select-none bg-notion-bg dark:bg-notion-darkBg">
-          <div className="flex items-center gap-2">
+        <header className="h-11 border-b border-notion-border dark:border-notion-darkBorder px-3 md:px-4 flex items-center justify-between text-xs shrink-0 select-none bg-notion-bg dark:bg-notion-darkBg">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 rounded transition-colors"
+              className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 rounded-lg transition-colors"
               title="Toggle Sidebar"
             >
-              <Menu size={16} />
+              <Menu size={18} />
             </button>
-            <span className="text-neutral-400 font-mono text-[11px]">PK Notes</span>
+            <div className="flex items-center gap-1.5">
+              <BookOpen size={15} className="text-rose-500 hidden sm:block" />
+              <span className="font-bold text-xs text-neutral-800 dark:text-neutral-200 tracking-tight">
+                PK Notes
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Action Tools Header */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => handleCreateNote()}
-              className="flex items-center gap-1 px-2 py-0.5 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors border border-neutral-200/60 dark:border-neutral-700/60"
+              title="New Note"
             >
-              <Plus size={13} />
-              <span>New Note</span>
+              <Plus size={14} />
+              <span className="hidden sm:inline">New Note</span>
             </button>
 
             <button
               onClick={() => setIsAICopilotOpen(true)}
-              className="flex items-center gap-1 px-2 py-0.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors font-semibold"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors font-semibold border border-rose-200/50 dark:border-rose-900/50"
+              title="AI Copilot"
             >
-              <Sparkles size={13} />
-              <span>Copilot</span>
+              <Sparkles size={14} />
+              <span className="hidden sm:inline">Copilot</span>
             </button>
 
             {/* User Access Status / Sign In Button */}
             {currentUser ? (
-              <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-[11px]">
-                <User size={12} className="text-emerald-500" />
-                <span className="font-medium truncate max-w-28 text-neutral-700 dark:text-neutral-200">
+              <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 text-xs">
+                <User size={12} className="text-emerald-500 shrink-0" />
+                <span className="font-medium truncate max-w-20 sm:max-w-28 text-neutral-700 dark:text-neutral-200">
                   {currentUser.name}
                 </span>
                 <button
                   onClick={handleLogout}
                   title="Sign Out"
-                  className="hover:text-rose-500 text-neutral-400 ml-1"
+                  className="hover:text-rose-500 text-neutral-400 ml-0.5 p-0.5"
                 >
-                  <LogOut size={11} />
+                  <LogOut size={12} />
                 </button>
               </div>
             ) : (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-1 px-2.5 py-0.5 text-[11px] bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-lg transition-colors border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 font-medium"
+                className="flex items-center gap-1 px-2 py-1 text-[11px] bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 rounded-lg transition-colors border border-amber-200/60 dark:border-amber-900/60 font-semibold"
+                title="Sign In / Request Edit Access"
               >
-                <Lock size={11} className="text-amber-500" />
-                <span>Request Edit Access</span>
+                <Lock size={12} className="text-amber-500 shrink-0" />
+                <span className="hidden sm:inline">Sign In</span>
+                <span className="sm:hidden">Auth</span>
               </button>
             )}
 
             {/* Dark Mode Toggle */}
             <button
               onClick={() => setDarkMode(!darkMode)}
-              className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 rounded transition-colors"
+              className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 rounded-lg transition-colors"
               title="Toggle Dark/Light Mode"
             >
-              {darkMode ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} />}
+              {darkMode ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
             </button>
 
             <a
               href="http://homelab.tail7d4c51.ts.net:5174"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-mono text-neutral-400 hover:text-rose-500 transition-colors"
+              className="hidden lg:flex items-center gap-1 px-2 py-1 text-[11px] font-mono text-neutral-400 hover:text-rose-500 transition-colors"
             >
               <span>PK Brain</span>
               <ExternalLink size={11} />
@@ -300,7 +321,7 @@ export default function App() {
         onSummarize={summarizeNote}
       />
 
-      {/* Auth & Access Request Modal */}
+      {/* Access Request / Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
