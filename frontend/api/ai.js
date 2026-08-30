@@ -3,20 +3,55 @@ import { checkRateLimit } from './_lib/rateLimiter.js';
 
 const TYPHOON_API_KEY = process.env.TYPHOON_API_KEY || 'sk-qkoC40SvURZUR0WMJFJGnI1Zul2R5Dyq6v2qarA2Fv6hFcyT';
 const TYPHOON_BASE_URL = process.env.TYPHOON_BASE_URL || 'https://api.opentyphoon.ai/v1';
+const ADMIN_PIN = process.env.ADMIN_PIN || '111248';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-pin');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // 1. Anti-DDoS Rate Limiting on AI Queries (Max 15 queries per minute per IP)
+  // 1. STRICT AUTHENTICATION GUARD: Zero unauthenticated AI usage!
+  const authHeader = req.headers['authorization'] || '';
+  const adminPinHeader = req.headers['x-admin-pin'] || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  let isAuthorized = false;
+
+  if (adminPinHeader && String(adminPinHeader).trim() === String(ADMIN_PIN).trim()) {
+    isAuthorized = true;
+  } else if (token === 'pk_master_admin_token') {
+    isAuthorized = true;
+  } else if (token.startsWith('pk_user_')) {
+    const userId = token.replace('pk_user_', '');
+    try {
+      const { data: user } = await supabase
+        .from('note_access_requests')
+        .select('id, status')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (user && user.status === 'approved') {
+        isAuthorized = true;
+      }
+    } catch (e) {
+      console.warn('DB check error:', e.message);
+    }
+  }
+
+  if (!isAuthorized) {
+    return res.status(401).json({
+      error: '🔒 AI Copilot is strictly reserved for approved members. Please Sign In or Request Access to use AI features.'
+    });
+  }
+
+  // 2. Anti-DDoS Rate Limiting on AI Queries (Max 15 queries per minute per IP)
   const rate = checkRateLimit(req, 'ai_query', 15, 60 * 1000);
   if (!rate.allowed) {
     return res.status(429).json({
-      error: `AI query limit reached for this IP. Please wait ${rate.resetInSeconds} seconds before trying again.`
+      error: `AI query limit reached. Please wait ${rate.resetInSeconds} seconds before trying again.`
     });
   }
 

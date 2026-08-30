@@ -231,9 +231,15 @@ export default function Editor({
           )}
 
           <button
-            onClick={() => onSummarize(title, body)}
+            onClick={() => {
+              if (isReadOnly) {
+                onRequestAuth();
+              } else {
+                onSummarize(title, body);
+              }
+            }}
             className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 rounded-lg transition-colors font-medium border border-rose-200/50 dark:border-rose-900/50"
-            title="AI Summarize"
+            title={isReadOnly ? "Sign in to use AI Summarize" : "AI Summarize"}
           >
             <Sparkles size={13} />
             <span>Summarize</span>

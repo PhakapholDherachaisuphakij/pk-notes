@@ -99,13 +99,21 @@ export async function createFolder(folderPath) {
   return await res.json();
 }
 
+function getAuthHeader() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('pk_notes_token') : null;
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
 export async function summarizeNote(title, content) {
   const res = await fetch(`${API_BASE}/ai/summarize`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
     body: JSON.stringify({ action: 'summarize', title, content })
   });
-  if (!res.ok) throw new Error(`AI summarize failed: ${res.status}`);
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `AI summarize failed: ${res.status}`);
+  }
   const data = await res.json();
   return data.summary || '';
 }
@@ -113,10 +121,13 @@ export async function summarizeNote(title, content) {
 export async function askVault(question) {
   const res = await fetch(`${API_BASE}/ai/ask-vault`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
     body: JSON.stringify({ action: 'ask-vault', question })
   });
-  if (!res.ok) throw new Error(`AI ask vault failed: ${res.status}`);
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `AI ask vault failed: ${res.status}`);
+  }
   const data = await res.json();
   return data.answer || '';
 }

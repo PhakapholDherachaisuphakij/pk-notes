@@ -189,7 +189,13 @@ export default function App() {
         onCreateNote={handleCreateNote}
         onCreateFolder={handleCreateFolder}
         onDeleteNote={handleDeleteNote}
-        onOpenAICopilot={() => setIsAICopilotOpen(true)}
+        onOpenAICopilot={() => {
+          if (!currentUser) {
+            setIsAuthModalOpen(true);
+          } else {
+            setIsAICopilotOpen(true);
+          }
+        }}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         isCollapsed={isSidebarCollapsed}
