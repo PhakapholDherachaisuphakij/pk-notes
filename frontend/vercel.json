@@ -3,6 +3,26 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/vault/tree",
+      "destination": "/api/tree"
+    },
+    {
+      "source": "/api/tree",
+      "destination": "/api/tree"
+    },
+    {
+      "source": "/api/notes",
+      "destination": "/api/notes"
+    },
+    {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth"
+    },
+    {
+      "source": "/api/ai/:path*",
+      "destination": "/api/ai"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

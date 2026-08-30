@@ -127,7 +127,13 @@ export async function requestAccess(name, email, password, reason) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'request-access', name, email, password, reason })
   });
-  const data = await res.json();
+  let data = {};
+  const text = await res.text();
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (e) {
+    if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+  }
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
@@ -138,7 +144,13 @@ export async function loginUser(credentials) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(credentials)
   });
-  const data = await res.json();
+  let data = {};
+  const text = await res.text();
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (e) {
+    if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+  }
   if (!res.ok) throw new Error(data.error || 'Login failed');
   return data;
 }
