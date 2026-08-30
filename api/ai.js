@@ -3,28 +3,22 @@ import { checkRateLimit } from './_lib/rateLimiter.js';
 
 const TYPHOON_API_KEY = process.env.TYPHOON_API_KEY || 'sk-qkoC40SvURZUR0WMJFJGnI1Zul2R5Dyq6v2qarA2Fv6hFcyT';
 const TYPHOON_BASE_URL = process.env.TYPHOON_BASE_URL || 'https://api.opentyphoon.ai/v1';
-const ADMIN_PIN = process.env.ADMIN_PIN || '111248';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-pin');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   // 1. STRICT AUTHENTICATION GUARD: Zero unauthenticated AI usage!
   const authHeader = req.headers['authorization'] || '';
-  const adminPinHeader = req.headers['x-admin-pin'] || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
   let isAuthorized = false;
 
-  if (adminPinHeader && String(adminPinHeader).trim() === String(ADMIN_PIN).trim()) {
-    isAuthorized = true;
-  } else if (token === 'pk_master_admin_token') {
-    isAuthorized = true;
-  } else if (token.startsWith('pk_user_')) {
+  if (token.startsWith('pk_user_')) {
     const userId = token.replace('pk_user_', '');
     try {
       const { data: user } = await supabase

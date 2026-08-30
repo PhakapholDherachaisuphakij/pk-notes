@@ -2,8 +2,6 @@ import { supabase } from './_lib/supabase.js';
 import { checkRateLimit } from './_lib/rateLimiter.js';
 import bcrypt from 'bcryptjs';
 
-const ADMIN_PIN = process.env.ADMIN_PIN || '111248';
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -72,17 +70,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, password, pin } = req.body;
-
-    // Master Admin PIN Login
-    if (pin && String(pin).trim() === String(ADMIN_PIN).trim()) {
-      return res.json({
-        success: true,
-        user: { name: 'Phakaphol (Admin)', email: 'admin@pk-notes.local', role: 'admin' },
-        token: 'pk_master_admin_token'
-      });
-    }
-
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
     }

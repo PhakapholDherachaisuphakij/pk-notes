@@ -19,8 +19,6 @@ export default function AuthModal({
   // Login Form State
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [adminPin, setAdminPin] = useState('');
-  const [usePin, setUsePin] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -50,9 +48,7 @@ export default function AuthModal({
     setLoading(true);
     setErrorMsg('');
     try {
-      const res = await loginUser(
-        usePin ? { pin: adminPin } : { email: loginEmail, password: loginPassword }
-      );
+      const res = await loginUser({ email: loginEmail, password: loginPassword });
       if (res.success && res.user) {
         onLoginSuccess(res.user, res.token);
         onClose();
@@ -74,54 +70,50 @@ export default function AuthModal({
               <Lock size={16} />
             </div>
             <div>
-              <h3 className="font-semibold text-sm text-neutral-800 dark:text-neutral-200">
-                Protected Workspace
+              <h3 className="font-bold text-sm text-neutral-800 dark:text-neutral-200">
+                PK Notes Access
               </h3>
               <p className="text-[11px] text-neutral-400">
-                Phakaphol's Obsidian Vault
+                Obsidian Vault & AI Workspace
               </p>
             </div>
           </div>
-
           <button
             onClick={onClose}
-            className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 rounded-lg transition-colors"
+            className="p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex items-center px-4 pt-3 gap-2 border-b border-neutral-100 dark:border-neutral-800 text-xs">
+        {/* Tab Switcher */}
+        <div className="flex border-b border-neutral-100 dark:border-neutral-800 text-xs font-semibold">
           <button
             onClick={() => { setTab('request'); setErrorMsg(''); }}
-            className={`pb-2.5 px-3 font-medium transition-colors border-b-2 flex items-center gap-1.5 ${
+            className={`flex-1 py-3 text-center transition-colors border-b-2 ${
               tab === 'request'
-                ? 'border-rose-500 text-rose-600 dark:text-rose-400'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+                ? 'border-rose-500 text-rose-500'
+                : 'border-transparent text-neutral-400 hover:text-neutral-600'
             }`}
           >
-            <UserCheck size={14} />
-            <span>Request Edit Access</span>
+            1. Request Edit Access
           </button>
-
           <button
             onClick={() => { setTab('login'); setErrorMsg(''); }}
-            className={`pb-2.5 px-3 font-medium transition-colors border-b-2 flex items-center gap-1.5 ${
+            className={`flex-1 py-3 text-center transition-colors border-b-2 ${
               tab === 'login'
-                ? 'border-rose-500 text-rose-600 dark:text-rose-400'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+                ? 'border-rose-500 text-rose-500'
+                : 'border-transparent text-neutral-400 hover:text-neutral-600'
             }`}
           >
-            <KeyRound size={14} />
-            <span>Sign In</span>
+            2. Sign In (Approved Users)
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-5 flex-1 overflow-y-auto">
+        {/* Content Body */}
+        <div className="p-5">
           {errorMsg && (
-            <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl text-xs text-rose-600 dark:text-rose-400 flex items-start gap-2">
+            <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 text-xs flex items-start gap-2">
               <ShieldAlert size={14} className="shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </div>
@@ -130,54 +122,57 @@ export default function AuthModal({
           {tab === 'request' ? (
             isSubmitted ? (
               <div className="text-center py-6 space-y-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-500 flex items-center justify-center mx-auto">
                   <CheckCircle2 size={24} />
                 </div>
-                <h4 className="font-semibold text-sm text-neutral-800 dark:text-neutral-200">
-                  Request Submitted!
+                <h4 className="font-bold text-sm text-neutral-800 dark:text-neutral-200">
+                  ส่งคำขอเข้าใช้งานสำเร็จแล้ว!
                 </h4>
                 <p className="text-xs text-neutral-500 max-w-xs mx-auto leading-relaxed">
-                  Your request has been forwarded to <strong>Phakaphol (Admin)</strong>. Once approved in PK Brain, you can log in with your email and password.
+                  คำขอของคุณถูกส่งไปยัง <b>PK Brain</b> แล้ว เมื่อแอดมิน Phakaphol กด Approve คุณจะสามารถนำ Email และ Password นี้มา Login เข้าใช้งานได้ทันทีครับ
                 </p>
                 <button
-                  onClick={() => { setTab('login'); setIsSubmitted(false); }}
-                  className="mt-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-xs font-semibold hover:bg-rose-600 transition-colors"
+                  onClick={() => {
+                    setIsSubmitted(false);
+                    setTab('login');
+                  }}
+                  className="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-700 dark:text-neutral-300 rounded-xl text-xs font-semibold transition-colors mt-2"
                 >
-                  Go to Sign In
+                  ไปที่หน้า Sign In
                 </button>
               </div>
             ) : (
               <form onSubmit={handleRequestSubmit} className="space-y-3 text-xs">
                 <p className="text-neutral-500 text-[11px] leading-relaxed">
-                  To edit or create notes in this Obsidian vault, please request access. Phakaphol will review and approve your request in PK Brain.
+                  กรอกข้อมูลเพื่อขอสิทธิ์แก้ไขโน้ตและใช้งาน AI เจ้าของ (Phakaphol) จะเป็นผู้อนุมัติผ่าน PK Brain เท่านั้น
                 </p>
 
                 <div>
-                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Your Full Name</label>
+                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">ชื่อ-นามสกุล / ชื่อเล่น</label>
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. John Doe"
+                    placeholder="เช่น สมชาย ใจดี"
                     className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder-neutral-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Email Address</label>
+                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Email</label>
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. john@example.com"
+                    placeholder="e.g. yourname@gmail.com"
                     className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder-neutral-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Desired Password</label>
+                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">ตั้งรหัสผ่านสำหรับเข้าสู่ระบบ</label>
                   <input
                     type="password"
                     required
@@ -189,12 +184,12 @@ export default function AuthModal({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Reason / Note to Admin</label>
+                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">เหตุผลที่ขอสิทธิ์เข้าใช้งาน</label>
                   <textarea
                     rows={2}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="e.g. Collaborating on SCB QA automation notes..."
+                    placeholder="เช่น ช่วยสรุปโน้ตวิชา KMUTT, ศึกษางาน SCB QA..."
                     className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder-neutral-400 resize-none"
                   />
                 </div>
@@ -202,73 +197,52 @@ export default function AuthModal({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm mt-2"
+                  className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm mt-2 cursor-pointer"
                 >
                   <Send size={13} />
-                  <span>{loading ? 'Submitting...' : 'Send Request to Admin'}</span>
+                  <span>{loading ? 'กำลังส่งคำขอ...' : 'ส่งคำขอเข้าใช้งาน (Send Request)'}</span>
                 </button>
               </form>
             )
           ) : (
             <form onSubmit={handleLoginSubmit} className="space-y-3 text-xs">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-neutral-500 text-[11px]">Sign in with approved credentials</span>
-                <button
-                  type="button"
-                  onClick={() => setUsePin(!usePin)}
-                  className="text-rose-500 hover:underline text-[11px] font-mono"
-                >
-                  {usePin ? 'Use Email / Password' : 'Admin Master PIN'}
-                </button>
+              <div className="mb-2">
+                <span className="text-neutral-500 text-[11px] leading-relaxed">
+                  เข้าสู่ระบบด้วย Email และ Password ที่ได้รับการอนุมัติจาก <b>PK Brain</b> แล้วเท่านั้น
+                </span>
               </div>
 
-              {usePin ? (
-                <div>
-                  <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Admin Master PIN</label>
-                  <input
-                    type="password"
-                    required
-                    value={adminPin}
-                    onChange={(e) => setAdminPin(e.target.value)}
-                    placeholder="Enter Master PIN"
-                    className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder-neutral-400 font-mono tracking-widest text-center"
-                  />
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Email</label>
-                    <input
-                      type="email"
-                      required
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="e.g. approved@example.com"
-                      className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder-neutral-400"
-                    />
-                  </div>
+              <div>
+                <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="e.g. approved@gmail.com"
+                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder-neutral-400"
+                />
+              </div>
 
-                  <div>
-                    <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder-neutral-400"
-                    />
-                  </div>
-                </>
-              )}
+              <div>
+                <label className="block font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder-neutral-400"
+                />
+              </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm mt-2"
+                className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm mt-2 cursor-pointer"
               >
                 <KeyRound size={13} />
-                <span>{loading ? 'Authenticating...' : 'Sign In & Unlock Editor'}</span>
+                <span>{loading ? 'กำลังตรวจสอบสิทธิ์...' : 'Sign In'}</span>
               </button>
             </form>
           )}
