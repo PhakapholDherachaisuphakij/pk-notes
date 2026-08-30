@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
 import AICopilotModal from './components/AICopilotModal';
+import AuthModal from './components/AuthModal';
 import { 
   fetchVaultTree, 
   fetchNote, 
@@ -17,7 +18,10 @@ import {
   Moon, 
   ExternalLink,
   Plus,
-  Sparkles
+  Sparkles,
+  Lock,
+  User,
+  LogOut
 } from 'lucide-react';
 
 export default function App() {
@@ -31,6 +35,17 @@ export default function App() {
     return localStorage.getItem('pk_notes_dark') !== 'false';
   });
   const [isAICopilotOpen, setIsAICopilotOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Current authenticated user state
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pk_notes_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   // Apply dark mode class to html
   useEffect(() => {
@@ -47,7 +62,6 @@ export default function App() {
     try {
       const tree = await fetchVaultTree();
       setVaultTree(tree);
-      // If no active note, pick first note in tree
       if (!activeNotePath && tree.length > 0) {
         const findFirst = (items) => {
           for (const item of items) {
@@ -82,6 +96,10 @@ export default function App() {
   };
 
   const handleSaveNote = async (path, title, body, attributes) => {
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     setIsSaving(true);
     try {
       await saveNote(path, title, body, attributes);
@@ -94,6 +112,10 @@ export default function App() {
   };
 
   const handleCreateNote = async (targetFolder = '') => {
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     const noteName = prompt('Enter new note title (e.g. SCB-Testing-Plan):');
     if (!noteName) return;
 
@@ -113,6 +135,10 @@ export default function App() {
   };
 
   const handleCreateFolder = async () => {
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     const folderName = prompt('Enter folder name (e.g. KMUTT-Semester-1):');
     if (!folderName) return;
 
@@ -125,6 +151,10 @@ export default function App() {
   };
 
   const handleDeleteNote = async (path) => {
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     try {
       await deleteNote(path);
       if (activeNotePath === path) {
@@ -135,6 +165,18 @@ export default function App() {
     } catch (err) {
       alert(`Delete failed: ${err.message}`);
     }
+  };
+
+  const handleLoginSuccess = (user, token) => {
+    setCurrentUser(user);
+    localStorage.setItem('pk_notes_user', JSON.stringify(user));
+    localStorage.setItem('pk_notes_token', token);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('pk_notes_user');
+    localStorage.removeItem('pk_notes_token');
   };
 
   return (
@@ -185,6 +227,31 @@ export default function App() {
               <span>Copilot</span>
             </button>
 
+            {/* User Access Status / Sign In Button */}
+            {currentUser ? (
+              <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-[11px]">
+                <User size={12} className="text-emerald-500" />
+                <span className="font-medium truncate max-w-28 text-neutral-700 dark:text-neutral-200">
+                  {currentUser.name}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  title="Sign Out"
+                  className="hover:text-rose-500 text-neutral-400 ml-1"
+                >
+                  <LogOut size={11} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-0.5 text-[11px] bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-lg transition-colors border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 font-medium"
+              >
+                <Lock size={11} className="text-amber-500" />
+                <span>Request Edit Access</span>
+              </button>
+            )}
+
             {/* Dark Mode Toggle */}
             <button
               onClick={() => setDarkMode(!darkMode)}
@@ -212,6 +279,8 @@ export default function App() {
           onSaveNote={handleSaveNote}
           onSummarize={() => setIsAICopilotOpen(true)}
           isSaving={isSaving}
+          currentUser={currentUser}
+          onRequestAuth={() => setIsAuthModalOpen(true)}
         />
       </main>
 
@@ -223,6 +292,13 @@ export default function App() {
         activeNoteContent={activeNote?.body}
         onAskVault={askVault}
         onSummarize={summarizeNote}
+      />
+
+      {/* Auth & Access Request Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
       />
     </div>
   );

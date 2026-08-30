@@ -11,15 +11,14 @@ import {
   List, 
   Quote, 
   Sparkles, 
-  Save, 
   Eye, 
   Edit3, 
   Tag, 
-  Calendar,
-  Layers,
-  Copy,
-  Check,
-  Table as TableIcon
+  Copy, 
+  Check, 
+  Table as TableIcon,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 const SLASH_COMMANDS = [
@@ -37,7 +36,9 @@ export default function Editor({
   note,
   onSaveNote,
   onSummarize,
-  isSaving
+  isSaving,
+  currentUser,
+  onRequestAuth
 }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -45,6 +46,8 @@ export default function Editor({
   const [tagInput, setTagInput] = useState('');
   const [viewMode, setViewMode] = useState('split'); // 'edit', 'preview', 'split'
   const [copied, setCopied] = useState(false);
+
+  const isReadOnly = !currentUser;
 
   // Slash Command Menu State
   const [showSlashMenu, setShowSlashMenu] = useState(false);
@@ -61,9 +64,9 @@ export default function Editor({
     }
   }, [note?.path]);
 
-  // Debounced Auto-Save
+  // Debounced Auto-Save for authenticated users
   useEffect(() => {
-    if (!note) return;
+    if (!note || isReadOnly) return;
     const timeout = setTimeout(() => {
       if (title !== note.title || body !== note.body) {
         onSaveNote(note.path, title, body, { ...note.attributes, tags, title });
@@ -90,6 +93,12 @@ export default function Editor({
 
   // Handle Slash Commands
   const handleKeyDown = (e) => {
+    if (isReadOnly) {
+      e.preventDefault();
+      onRequestAuth();
+      return;
+    }
+
     if (showSlashMenu) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -109,11 +118,14 @@ export default function Editor({
   };
 
   const handleTextChange = (e) => {
+    if (isReadOnly) {
+      onRequestAuth();
+      return;
+    }
     const val = e.target.value;
     const cursor = e.target.selectionStart;
     setBody(val);
 
-    // Check if user just typed a slash at the start of a line or after space
     const beforeCursor = val.slice(0, cursor);
     const lastLine = beforeCursor.split('\n').pop();
 
@@ -134,7 +146,7 @@ export default function Editor({
     const beforeCursor = body.slice(0, cursor);
     const afterCursor = body.slice(cursor);
     const lines = beforeCursor.split('\n');
-    lines.pop(); // remove the line with the slash
+    lines.pop();
 
     const newBefore = lines.length > 0 ? lines.join('\n') + '\n' + cmd.syntax : cmd.syntax;
     const newBody = newBefore + afterCursor;
@@ -154,6 +166,10 @@ export default function Editor({
   );
 
   const addTag = () => {
+    if (isReadOnly) {
+      onRequestAuth();
+      return;
+    }
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
       const newTags = [...tags, tagInput.trim()];
       setTags(newTags);
@@ -162,6 +178,10 @@ export default function Editor({
   };
 
   const removeTag = (t) => {
+    if (isReadOnly) {
+      onRequestAuth();
+      return;
+    }
     setTags(tags.filter(x => x !== t));
   };
 
@@ -179,7 +199,14 @@ export default function Editor({
           <span className="font-mono text-[11px] truncate max-w-xs">{note.path}</span>
           <span className="text-neutral-300 dark:text-neutral-700">|</span>
           <span className="flex items-center gap-1 text-[11px]">
-            {isSaving ? (
+            {isReadOnly ? (
+              <span 
+                onClick={onRequestAuth}
+                className="text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded cursor-pointer hover:underline border border-amber-200 dark:border-amber-900"
+              >
+                <Lock size={12} /> Read-Only (Request Edit Access)
+              </span>
+            ) : isSaving ? (
               <span className="text-amber-500 flex items-center gap-1 font-mono">
                 <span className="animate-spin text-xs">⟳</span> Saving...
               </span>
@@ -193,6 +220,16 @@ export default function Editor({
 
         {/* View Mode & Actions */}
         <div className="flex items-center gap-2">
+          {isReadOnly && (
+            <button
+              onClick={onRequestAuth}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors font-medium text-xs shadow-xs"
+            >
+              <Unlock size={12} />
+              <span>Unlock Editing</span>
+            </button>
+          )}
+
           <button
             onClick={() => onSummarize(title, body)}
             className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 rounded-lg transition-colors font-medium border border-rose-200/50 dark:border-rose-900/50"
@@ -243,10 +280,14 @@ export default function Editor({
       <div className="flex-1 flex overflow-hidden">
         {/* Editor Pane */}
         {(viewMode === 'edit' || viewMode === 'split') && (
-          <div className={`flex-1 flex flex-col overflow-y-auto px-8 py-6 relative ${viewMode === 'split' ? 'border-r border-notion-border dark:border-notion-darkBorder' : ''}`}>
+          <div 
+            onClick={() => isReadOnly && onRequestAuth()}
+            className={`flex-1 flex flex-col overflow-y-auto px-8 py-6 relative ${viewMode === 'split' ? 'border-r border-notion-border dark:border-notion-darkBorder' : ''}`}
+          >
             {/* Note Title */}
             <input
               type="text"
+              readOnly={isReadOnly}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Untitled Document..."
@@ -264,32 +305,35 @@ export default function Editor({
                   className="bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 px-2 py-0.5 rounded-full flex items-center gap-1 border border-neutral-200 dark:border-neutral-700 font-mono text-[11px]"
                 >
                   #{t}
-                  <button onClick={() => removeTag(t)} className="hover:text-rose-500">×</button>
+                  {!isReadOnly && <button onClick={() => removeTag(t)} className="hover:text-rose-500">×</button>}
                 </span>
               ))}
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                placeholder="+ Add tag (Enter)"
-                className="bg-transparent border-none text-xs focus:outline-none placeholder-neutral-400 font-mono text-[11px] w-28"
-              />
+              {!isReadOnly && (
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                  placeholder="+ Add tag (Enter)"
+                  className="bg-transparent border-none text-xs focus:outline-none placeholder-neutral-400 font-mono text-[11px] w-28"
+                />
+              )}
             </div>
 
             {/* Textarea */}
             <div className="flex-1 relative">
               <textarea
                 ref={textareaRef}
+                readOnly={isReadOnly}
                 value={body}
                 onChange={handleTextChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Type '/' for commands (# h1, code, checklist, callout)..."
+                placeholder={isReadOnly ? "Read-only mode. Click here to request edit access from Phakaphol." : "Type '/' for commands (# h1, code, checklist, callout)..."}
                 className="w-full h-full bg-transparent resize-none border-none focus:outline-none font-mono text-sm leading-relaxed text-neutral-800 dark:text-neutral-200 placeholder-neutral-400"
               />
 
               {/* Slash Commands Dropdown Menu */}
-              {showSlashMenu && filteredCommands.length > 0 && (
+              {showSlashMenu && !isReadOnly && filteredCommands.length > 0 && (
                 <div className="absolute left-0 top-12 w-64 bg-white dark:bg-neutral-800 border border-notion-border dark:border-notion-darkBorder rounded-xl shadow-xl z-50 p-1.5 space-y-0.5 max-h-60 overflow-y-auto">
                   <div className="px-2 py-1 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
                     Basic Blocks

@@ -4,14 +4,21 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import fm from 'front-matter';
+import bcrypt from 'bcryptjs';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5176;
 const VAULT_ROOT = process.env.VAULT_ROOT || '/home/phakaphol/obsidian-vault';
-const TYPHOON_API_KEY = process.env.TYPHOON_API_KEY || 'sk-c0v2c1K8eXhC7G2k9P5mQ4wL6nR8sT0uV3yZ1aB4dE7fH9jK';
-const TYPHOON_BASE_URL = 'https://api.opentyphoon.ai/v1';
+const ADMIN_PIN = process.env.ADMIN_PIN || '111248';
+const TYPHOON_API_KEY = process.env.TYPHOON_API_KEY || 'sk-qkoC40SvURZUR0WMJFJGnI1Zul2R5Dyq6v2qarA2Fv6hFcyT';
+const TYPHOON_BASE_URL = process.env.TYPHOON_BASE_URL || 'https://api.opentyphoon.ai/v1';
+
+const supabaseUrl = process.env.SUPABASE_URL || 'http://localhost:8000';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
@@ -31,13 +38,14 @@ function getSafePath(relativePath = '') {
   return fullPath;
 }
 
-// Helper: Build file tree
+// Helper: Build file tree from disk
 function getVaultTree(dir = VAULT_ROOT, relativeBase = '') {
+  if (!fs.existsSync(dir)) return [];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const result = [];
 
   for (const entry of entries) {
-    if (entry.name.startsWith('.')) continue; // ignore hidden files/folders (.obsidian, .git)
+    if (entry.name.startsWith('.')) continue;
     const relPath = path.join(relativeBase, entry.name);
     const fullPath = path.join(dir, entry.name);
 
@@ -71,46 +79,167 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'PK Notes Backend', vault: VAULT_ROOT, port: PORT });
 });
 
-// 2. Get vault file tree
-app.get('/api/vault/tree', (req, res) => {
+// 2. Auth: Submit Access Request
+app.post('/api/auth/request-access', async (req, res) => {
   try {
-    const tree = getVaultTree();
-    res.json({ success: true, tree });
+    const { name, email, password, reason } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, Email, and Password are required' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const { data, error } = await supabase
+      .from('note_access_requests')
+      .upsert({
+        name,
+        email: email.toLowerCase().trim(),
+        password_hash: passwordHash,
+        reason: reason || 'Request access to PK Notes',
+        status: 'pending',
+        role: 'editor'
+      }, { onConflict: 'email' })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, message: 'Access request submitted! Waiting for Admin Phakaphol approval.', data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 3. Read note
-app.get('/api/notes', (req, res) => {
+// 3. Auth: Login
+app.post('/api/auth/login', async (req, res) => {
   try {
-    const notePath = req.query.path;
-    if (!notePath) return res.status(400).json({ error: 'Path is required' });
+    const { email, password, pin } = req.body;
 
-    const fullPath = getSafePath(notePath);
-    if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({ error: 'Note not found' });
+    // Admin Master PIN Login
+    if (pin && pin === ADMIN_PIN) {
+      return res.json({
+        success: true,
+        user: { name: 'Phakaphol (Admin)', email: 'admin@pk-notes.local', role: 'admin' },
+        token: 'pk_master_admin_token'
+      });
     }
 
-    const raw = fs.readFileSync(fullPath, 'utf8');
-    const parsed = fm(raw);
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    const { data: user, error } = await supabase
+      .from('note_access_requests')
+      .select('*')
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle();
+
+    if (error || !user) {
+      return res.status(401).json({ error: 'User not found. Please submit an access request.' });
+    }
+
+    if (user.status !== 'approved') {
+      return res.status(403).json({ 
+        error: `Your access request is currently "${user.status}". Please wait for Phakaphol to approve in PK Brain.` 
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid password' });
+    }
 
     res.json({
       success: true,
-      path: notePath,
-      fileName: path.basename(notePath),
-      title: parsed.attributes.title || path.basename(notePath, '.md'),
-      attributes: parsed.attributes,
-      body: parsed.body,
-      raw
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      token: `pk_user_${user.id}`
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 4. Create or Save note
-app.post('/api/notes', (req, res) => {
+// 4. Get vault file tree
+app.get('/api/vault/tree', async (req, res) => {
+  try {
+    const localTree = getVaultTree();
+    if (localTree.length > 0) {
+      return res.json({ success: true, tree: localTree });
+    }
+
+    // Fallback to Supabase vault_notes
+    const { data: dbNotes } = await supabase.from('vault_notes').select('path, title, updated_at');
+    const treeMap = {};
+    for (const n of dbNotes || []) {
+      const parts = n.path.split('/');
+      if (parts.length > 1) {
+        const folder = parts[0];
+        if (!treeMap[folder]) treeMap[folder] = { type: 'folder', name: folder, path: folder, children: [] };
+        treeMap[folder].children.push({
+          type: 'note',
+          name: n.title || parts[1].replace(/\.md$/, ''),
+          fileName: parts[1],
+          path: n.path,
+          updatedAt: n.updated_at
+        });
+      } else {
+        treeMap[n.path] = {
+          type: 'note',
+          name: n.title || n.path.replace(/\.md$/, ''),
+          fileName: n.path,
+          path: n.path,
+          updatedAt: n.updated_at
+        };
+      }
+    }
+    res.json({ success: true, tree: Object.values(treeMap) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Read note
+app.get('/api/notes', async (req, res) => {
+  try {
+    const notePath = req.query.path;
+    if (!notePath) return res.status(400).json({ error: 'Path is required' });
+
+    const fullPath = getSafePath(notePath);
+    if (fs.existsSync(fullPath)) {
+      const raw = fs.readFileSync(fullPath, 'utf8');
+      const parsed = fm(raw);
+      return res.json({
+        success: true,
+        path: notePath,
+        fileName: path.basename(notePath),
+        title: parsed.attributes.title || path.basename(notePath, '.md'),
+        attributes: parsed.attributes,
+        body: parsed.body,
+        raw
+      });
+    }
+
+    // Fallback to Supabase
+    const { data: dbNote } = await supabase.from('vault_notes').select('*').eq('path', notePath).maybeSingle();
+    if (dbNote) {
+      return res.json({
+        success: true,
+        path: dbNote.path,
+        fileName: path.basename(dbNote.path),
+        title: dbNote.title,
+        attributes: dbNote.attributes,
+        body: dbNote.body
+      });
+    }
+
+    res.status(404).json({ error: 'Note not found' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6. Create or Save note (Writes to Disk + Syncs to Supabase DB)
+app.post('/api/notes', async (req, res) => {
   try {
     const { path: relPath, title, body, attributes } = req.body;
     if (!relPath) return res.status(400).json({ error: 'Path is required' });
@@ -124,11 +253,10 @@ app.post('/api/notes', (req, res) => {
       fs.mkdirSync(parentDir, { recursive: true });
     }
 
-    // Build Frontmatter YAML
     const meta = {
       title: title || path.basename(finalPath, '.md'),
       created: attributes?.created || new Date().toISOString().split('T')[0],
-      category: attributes?.category || path.dirname(finalPath) === '.' ? 'General' : path.dirname(finalPath),
+      category: attributes?.category || (path.dirname(finalPath) === '.' ? 'General' : path.dirname(finalPath)),
       tags: attributes?.tags || [],
       ...attributes
     };
@@ -146,14 +274,23 @@ app.post('/api/notes', (req, res) => {
     const fullContent = yamlHeader + (body || '');
     fs.writeFileSync(fullPath, fullContent, 'utf8');
 
+    // Sync to Supabase DB for Vercel/Cloud availability
+    await supabase.from('vault_notes').upsert({
+      path: finalPath,
+      title: meta.title,
+      body: body || '',
+      attributes: meta,
+      updated_at: new Date().toISOString()
+    }).catch(e => console.warn('Supabase note sync warning:', e.message));
+
     res.json({ success: true, path: finalPath, title: meta.title });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 5. Delete note
-app.delete('/api/notes', (req, res) => {
+// 7. Delete note
+app.delete('/api/notes', async (req, res) => {
   try {
     const notePath = req.query.path;
     if (!notePath) return res.status(400).json({ error: 'Path is required' });
@@ -162,13 +299,15 @@ app.delete('/api/notes', (req, res) => {
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);
     }
+    await supabase.from('vault_notes').delete().eq('path', notePath).catch(() => {});
+
     res.json({ success: true, deleted: notePath });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 6. Create folder
+// 8. Create folder
 app.post('/api/folders', (req, res) => {
   try {
     const { path: folderPath } = req.body;
@@ -184,13 +323,13 @@ app.post('/api/folders', (req, res) => {
   }
 });
 
-// 7. AI Copilot: Summarize note
+// 9. AI Copilot: Summarize note with Typhoon AI
 app.post('/api/ai/summarize', async (req, res) => {
   try {
     const { content, title } = req.body;
     if (!content) return res.status(400).json({ error: 'Content is required' });
 
-    const prompt = `คุณคือ Hermes / PK Notes AI Copilot สรุปเนื้อหาโน้ตต่อไปนี้ให้กระชับ ชัดเจน เป็น Bullet points พร้อมระบุ Key Takeaways:
+    const prompt = `คุณคือ Hermes & PK Notes AI Copilot สรุปเนื้อหาโน้ตต่อไปนี้ให้กระชับ ชัดเจน เป็น Bullet points พร้อมระบุ Key Takeaways:
 หัวข้อ: ${title || 'Note'}
 เนื้อหา:
 """
@@ -211,10 +350,7 @@ ${content}
       })
     });
 
-    if (!response.ok) {
-      throw new Error(`AI API failed: ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`Typhoon AI status ${response.status}`);
     const data = await response.json();
     const summary = data.choices?.[0]?.message?.content || 'ไม่สามารถสรุปได้';
     res.json({ success: true, summary });
@@ -223,15 +359,15 @@ ${content}
   }
 });
 
-// 8. AI Copilot: Ask entire Vault (RAG Search)
+// 10. AI Copilot: Ask entire Vault (RAG Search)
 app.post('/api/ai/ask-vault', async (req, res) => {
   try {
     const { question } = req.body;
     if (!question) return res.status(400).json({ error: 'Question is required' });
 
-    // Collect all markdown notes in vault
     function collectAllNotes(dir = VAULT_ROOT) {
       let notes = [];
+      if (!fs.existsSync(dir)) return notes;
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
         if (e.name.startsWith('.')) continue;
@@ -246,7 +382,11 @@ app.post('/api/ai/ask-vault', async (req, res) => {
       return notes;
     }
 
-    const allNotes = collectAllNotes().slice(0, 12).join('\n\n---\n\n');
+    let allNotes = collectAllNotes().slice(0, 12).join('\n\n---\n\n');
+    if (!allNotes) {
+      const { data: dbNotes } = await supabase.from('vault_notes').select('path, title, body').limit(10);
+      allNotes = (dbNotes || []).map(n => `[File: ${n.path}]\n${n.body}`).join('\n\n---\n\n');
+    }
 
     const prompt = `คุณคือ PK Notes Second Brain ผู้ช่วยอัจฉริยะที่เข้าถึง Obsidian Vault ทั้งหมดของ Phakaphol (PK)
 โปรดตอบคำถามของผู้ใช้โดยอ้างอิงจากเนื้อหาใน Vault ต่อไปนี้อย่างกระชับและแม่นยำ พร้อมระบุชื่อไฟล์ที่อ้างอิง:
@@ -273,8 +413,9 @@ ${allNotes}
       })
     });
 
+    if (!response.ok) throw new Error(`Typhoon AI status ${response.status}`);
     const data = await response.json();
-    const answer = data.choices?.[0]?.message?.content || 'ไม่พบคำตอบ';
+    const answer = data.choices?.[0]?.message?.content || 'ไม่พบข้อมูลในคลังโน้ต';
     res.json({ success: true, answer });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
