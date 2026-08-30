@@ -1,6 +1,10 @@
-const API_BASE = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
-  ? 'http://localhost:5176/api'
-  : `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:5176/api`;
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+// When running on local machine, target the local Express server on 5176.
+// When deployed on Vercel or Tailscale, target relative /api (handled by Vercel Serverless / Proxy).
+const API_BASE = isLocal 
+  ? 'http://localhost:5176/api' 
+  : '/api';
 
 export async function fetchVaultTree() {
   const res = await fetch(`${API_BASE}/vault/tree`);
@@ -47,7 +51,7 @@ export async function summarizeNote(title, content) {
   const res = await fetch(`${API_BASE}/ai/summarize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, content })
+    body: JSON.stringify({ action: 'summarize', title, content })
   });
   if (!res.ok) throw new Error(`AI summarize failed: ${res.status}`);
   const data = await res.json();
@@ -58,7 +62,7 @@ export async function askVault(question) {
   const res = await fetch(`${API_BASE}/ai/ask-vault`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question })
+    body: JSON.stringify({ action: 'ask-vault', question })
   });
   if (!res.ok) throw new Error(`AI ask vault failed: ${res.status}`);
   const data = await res.json();
@@ -69,7 +73,7 @@ export async function requestAccess(name, email, password, reason) {
   const res = await fetch(`${API_BASE}/auth/request-access`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, email, password, reason })
+    body: JSON.stringify({ action: 'request-access', name, email, password, reason })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
