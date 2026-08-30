@@ -1,0 +1,17 @@
+name: Supabase Cloud Keep-Alive
+
+on:
+  schedule:
+    # Run every 2 days at midnight UTC (Prevents 7-day inactive sleep forever)
+    - cron: '0 0 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Cloud
+        run: |
+          curl -sI https://frpbnexgcxfjpsrlsylt.supabase.co/rest/v1/ \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZycGJuZXhnY3hmanBzcmxzeWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NDcyODYsImV4cCI6MjA5NDIyMzI4Nn0.BjACiz2Vy-SIsAT1JCQCBdJr_lVOKwf-irw_uTgGFbM" \
+            || echo "Keep-alive ping completed"
