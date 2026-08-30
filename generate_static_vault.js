@@ -53,20 +53,31 @@ function scanVault(dir = VAULT_ROOT, relBase = '') {
         type: 'folder',
         name: entry.name,
         path: relPath,
+        isPrivate: entry.name.toLowerCase() === 'private',
         children: scanVault(fullPath, relPath)
       });
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
       const raw = fs.readFileSync(fullPath, 'utf8');
       const parsed = parseMarkdown(raw);
+      const isPrivate = parsed.attributes.visibility === 'private' || 
+                        parsed.attributes.is_private === 'true' || 
+                        parsed.attributes.is_private === true || 
+                        relPath.toLowerCase().includes('private') ||
+                        (Array.isArray(parsed.attributes.tags) && parsed.attributes.tags.includes('private'));
+
       result.push({
         type: 'note',
         name: entry.name.replace(/\.md$/, ''),
         fileName: entry.name,
         path: relPath,
         title: parsed.attributes.title || entry.name.replace(/\.md$/, ''),
-        attributes: parsed.attributes || {},
-        body: parsed.body || '',
-        raw
+        attributes: { ...parsed.attributes, is_private: isPrivate },
+        isPrivate,
+        // Shield private note bodies in public static build
+        body: isPrivate 
+          ? '> 🔒 **Private Note:** โน้ตนี้เป็นบันทึกส่วนตัวเฉพาะเจ้าของ (Phakaphol) หรือผู้ที่ได้รับอนุญาตเท่านั้น กรุณาเข้าสู่ระบบเพื่อดูเนื้อหา' 
+          : (parsed.body || ''),
+        raw: isPrivate ? '' : raw
       });
     }
   }
@@ -83,4 +94,4 @@ export const STATIC_VAULT_TREE = ${JSON.stringify(vaultData, null, 2)};
 `;
 
 fs.writeFileSync(OUTPUT_FILE, code, 'utf8');
-console.log('✅ Generated static vault snapshot with', vaultData.length, 'root items.');
+console.log('✅ Generated static vault snapshot with', vaultData.length, 'root items (Private Notes Shielded).');

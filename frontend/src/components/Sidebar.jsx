@@ -89,8 +89,17 @@ export default function Sidebar({
           style={{ paddingLeft: `${depth * 14 + 20}px` }}
         >
           <div className="flex items-center gap-2 truncate">
-            <FileText size={14} className={isActive ? "text-rose-500 shrink-0" : "text-neutral-400 shrink-0"} />
+            {item.isPrivate ? (
+              <Lock size={13} className="text-amber-500 shrink-0" title="Private Note" />
+            ) : (
+              <FileText size={14} className={isActive ? "text-rose-500 shrink-0" : "text-neutral-400 shrink-0"} />
+            )}
             <span className="truncate">{item.name}</span>
+            {item.isPrivate && (
+              <span className="text-[9px] font-mono px-1 rounded bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-300/60 dark:border-amber-800/60">
+                Private
+              </span>
+            )}
           </div>
           <button
             onClick={(e) => {

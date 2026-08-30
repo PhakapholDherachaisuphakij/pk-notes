@@ -47,6 +47,8 @@ export default function Editor({
   const [viewMode, setViewMode] = useState('split'); // 'edit', 'preview', 'split'
   const [copied, setCopied] = useState(false);
 
+  const [isPrivate, setIsPrivate] = useState(false);
+
   const isReadOnly = !currentUser;
 
   // Slash Command Menu State
@@ -61,6 +63,7 @@ export default function Editor({
       setTitle(note.title || '');
       setBody(note.body || '');
       setTags(note.attributes?.tags || []);
+      setIsPrivate(!!note.isPrivate || !!note.attributes?.is_private || note.path?.toLowerCase().includes('private') || (Array.isArray(note.attributes?.tags) && note.attributes.tags.includes('private')));
     }
   }, [note?.path]);
 
@@ -69,11 +72,17 @@ export default function Editor({
     if (!note || isReadOnly) return;
     const timeout = setTimeout(() => {
       if (title !== note.title || body !== note.body) {
-        onSaveNote(note.path, title, body, { ...note.attributes, tags, title });
+        onSaveNote(note.path, title, body, { 
+          ...note.attributes, 
+          tags, 
+          title, 
+          is_private: isPrivate, 
+          visibility: isPrivate ? 'private' : 'public' 
+        });
       }
     }, 1200);
     return () => clearTimeout(timeout);
-  }, [title, body, tags]);
+  }, [title, body, tags, isPrivate]);
 
   if (!note) {
     return (
@@ -87,6 +96,33 @@ export default function Editor({
         <p className="text-xs text-neutral-400 text-center max-w-sm">
           Everything you write here is saved as clean, local Markdown directly in your Obsidian Vault.
         </p>
+      </div>
+    );
+  }
+
+  // Locked Note View for Private notes when guest is viewing
+  if (isPrivate && isReadOnly) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-neutral-400 p-8 select-none bg-neutral-50/50 dark:bg-neutral-900/30">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4 text-amber-500 shadow-sm">
+          <Lock size={32} />
+        </div>
+        <span className="text-[11px] font-mono uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 mb-2">
+          Private Note
+        </span>
+        <h2 className="text-xl font-bold text-neutral-800 dark:text-neutral-200 mb-2 tracking-tight">
+          {title || note.name}
+        </h2>
+        <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center max-w-sm mb-6">
+          บันทึกนี้ถูกตั้งค่าเป็นส่วนตัว (Private Note) สำหรับเจ้าของ (Phakaphol) หรือผู้ที่ได้รับอนุญาตเท่านั้น
+        </p>
+        <button
+          onClick={onRequestAuth}
+          className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold text-xs shadow-md transition-all cursor-pointer hover:scale-105"
+        >
+          <Unlock size={14} />
+          <span>Sign In to Unlock Note</span>
+        </button>
       </div>
     );
   }
@@ -302,7 +338,35 @@ export default function Editor({
 
             {/* Metadata Tags Bar */}
             <div className="flex flex-wrap items-center gap-2 pb-4 mb-6 border-b border-notion-border dark:border-notion-darkBorder text-xs text-neutral-500">
-              <span className="flex items-center gap-1 font-mono text-[11px] text-neutral-400">
+              {/* Private / Public Toggle */}
+              <button
+                onClick={() => {
+                  if (isReadOnly) {
+                    onRequestAuth();
+                  } else {
+                    const next = !isPrivate;
+                    setIsPrivate(next);
+                    onSaveNote(note.path, title, body, { 
+                      ...note.attributes, 
+                      tags, 
+                      title, 
+                      is_private: next, 
+                      visibility: next ? 'private' : 'public' 
+                    });
+                  }
+                }}
+                className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono transition-all border cursor-pointer ${
+                  isPrivate 
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20' 
+                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+                }`}
+                title={isPrivate ? "Click to make Public" : "Click to make Private (Lock)"}
+              >
+                <Lock size={11} className={isPrivate ? "text-amber-500" : "text-neutral-400"} />
+                <span>{isPrivate ? '🔒 Private (Locked)' : '🌐 Public'}</span>
+              </button>
+
+              <span className="flex items-center gap-1 font-mono text-[11px] text-neutral-400 ml-1">
                 <Tag size={12} /> Tags:
               </span>
               {tags.map((t) => (
