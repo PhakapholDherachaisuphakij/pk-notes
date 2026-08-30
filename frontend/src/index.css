@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans m-0 p-0 overflow-hidden text-[15px];
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-300 dark:bg-neutral-700 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-neutral-400 dark:bg-neutral-600;
+}
+
+/* Markdown typography styling */
+.markdown-body h1 {
+  @apply text-3xl font-bold mt-6 mb-4 tracking-tight border-b border-notion-border dark:border-notion-darkBorder pb-2;
+}
+
+.markdown-body h2 {
+  @apply text-2xl font-semibold mt-5 mb-3 tracking-tight;
+}
+
+.markdown-body h3 {
+  @apply text-xl font-medium mt-4 mb-2;
+}
+
+.markdown-body p {
+  @apply my-2 leading-relaxed;
+}
+
+.markdown-body ul {
+  @apply list-disc list-inside my-2 space-y-1 pl-2;
+}
+
+.markdown-body ol {
+  @apply list-decimal list-inside my-2 space-y-1 pl-2;
+}
+
+.markdown-body blockquote {
+  @apply border-l-4 border-notion-accent/60 pl-4 py-1 my-3 italic text-notion-muted dark:text-notion-darkMuted bg-neutral-100/50 dark:bg-neutral-800/40 rounded-r;
+}
+
+.markdown-body code:not(pre code) {
+  @apply font-mono text-[13px] bg-neutral-200/70 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-rose-600 dark:text-rose-400;
+}
+
+.markdown-body pre {
+  @apply font-mono text-[13px] bg-[#1e1e1e] text-neutral-100 p-4 rounded-xl my-4 overflow-x-auto border border-neutral-800;
+}
+
+.markdown-body hr {
+  @apply border-notion-border dark:border-notion-darkBorder my-6;
+}
+
+.markdown-body table {
+  @apply w-full my-4 border-collapse text-left border border-notion-border dark:border-notion-darkBorder rounded-lg overflow-hidden;
+}
+
+.markdown-body th {
+  @apply bg-neutral-100 dark:bg-neutral-800/70 p-2.5 font-semibold text-xs border border-notion-border dark:border-notion-darkBorder;
+}
+
+.markdown-body td {
+  @apply p-2.5 text-xs border border-notion-border dark:border-notion-darkBorder;
+}
+
+.markdown-body input[type="checkbox"] {
+  @apply mr-2 accent-rose-500 rounded;
+}
